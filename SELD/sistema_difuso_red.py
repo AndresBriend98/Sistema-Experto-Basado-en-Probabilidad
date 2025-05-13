@@ -150,8 +150,8 @@ class SistemaExpertoDifuso:
             )
         return resultados
 
-    def defuzzificar(self, resultados):
-        """Convierte resultados difusos en valores precisos"""
+    def defuzzificar(self, resultados, metodo='centroide'):
+        """Convierte resultados difusos en valores precisos usando el método especificado"""
         valores_defuzzificados = {}
         for var_salida, grados in resultados.items():
             # Crear puntos para defuzzificación
@@ -171,9 +171,22 @@ class SistemaExpertoDifuso:
                 elif valor == 'Muy Bueno':
                     mu = np.maximum(mu, grado * trapezoide(x, 80, 90, 100, 100))
             
-            # Calcular centro de gravedad
             if np.sum(mu) > 0:
-                valor_defuzzificado = np.sum(x * mu) / np.sum(mu)
+                if metodo == 'centroide':
+                    # Método del centro de gravedad
+                    valor_defuzzificado = np.sum(x * mu) / np.sum(mu)
+                elif metodo == 'trapezoide':
+                    # Método del trapezoide (bisector)
+                    area_total = np.sum(mu)
+                    area_mitad = area_total / 2
+                    area_acumulada = 0
+                    for i in range(len(x)):
+                        area_acumulada += mu[i]
+                        if area_acumulada >= area_mitad:
+                            valor_defuzzificado = x[i]
+                            break
+                else:
+                    raise ValueError("Método de defuzzificación no válido")
                 valores_defuzzificados[var_salida] = valor_defuzzificado
             else:
                 valores_defuzzificados[var_salida] = 50  # Valor por defecto
@@ -202,27 +215,27 @@ class SistemaExpertoDifuso:
             }
         return diagnostico
 
-    def diagnosticar(self, entradas):
+    def diagnosticar(self, entradas, metodo_defuzzificacion='centroide'):
         """Realiza el diagnóstico completo"""
         # Evaluar reglas
         resultados = self.evaluar_reglas(entradas)
         
         # Defuzzificar resultados
-        valores_defuzzificados = self.defuzzificar(resultados)
+        valores_defuzzificados = self.defuzzificar(resultados, metodo=metodo_defuzzificacion)
         
         # Obtener diagnóstico y acciones
         diagnostico = self.obtener_diagnostico(valores_defuzzificados)
         
         return diagnostico
 
-def ejecutar_caso_prueba(sistema, caso_numero, entradas):
+def ejecutar_caso_prueba(sistema, caso_numero, entradas, metodo_defuzzificacion='centroide'):
     """Ejecuta un caso de prueba y muestra los resultados"""
     print(f"\nCaso de Prueba {caso_numero}")
     print("Entradas:")
     for var, valor in entradas.items():
         print(f"- {sistema.variables_entrada[var]}: {valor}")
     
-    diagnostico = sistema.diagnosticar(entradas)
+    diagnostico = sistema.diagnosticar(entradas, metodo_defuzzificacion=metodo_defuzzificacion)
     
     print("\nDiagnóstico:")
     for var, info in diagnostico.items():
@@ -234,6 +247,22 @@ def ejecutar_caso_prueba(sistema, caso_numero, entradas):
 def main():
     # Crear instancia del sistema
     sistema = SistemaExpertoDifuso()
+    
+    # Preguntar por el método de defuzzificación
+    print("\nSeleccione el método de defuzzificación:")
+    print("1. Centroide (más suave)")
+    print("2. Trapezoide (más definitivo)")
+    while True:
+        try:
+            opcion = int(input("\nIngrese su opción (1 o 2): "))
+            if opcion in [1, 2]:
+                break
+            print("Opción no válida. Por favor ingrese 1 o 2.")
+        except ValueError:
+            print("Por favor ingrese un número válido.")
+    
+    metodo = 'centroide' if opcion == 1 else 'trapezoide'
+    print(f"\nUsando método: {metodo}")
     
     # Casos de prueba
     casos = [
@@ -274,9 +303,9 @@ def main():
         }
     ]
     
-    # Ejecutar casos de prueba
+    # Ejecutar casos de prueba con el método seleccionado
     for i, caso in enumerate(casos, 1):
-        ejecutar_caso_prueba(sistema, i, caso)
+        ejecutar_caso_prueba(sistema, i, caso, metodo_defuzzificacion=metodo)
     
     # Modo interactivo
     print("\n\n--- Modo Interactivo ---")
@@ -286,7 +315,7 @@ def main():
         valor = float(input(f"{desc} (0-100): "))
         entradas[var] = valor
     
-    ejecutar_caso_prueba(sistema, "Interactivo", entradas)
+    ejecutar_caso_prueba(sistema, "Interactivo", entradas, metodo_defuzzificacion=metodo)
 
 if __name__ == "__main__":
     main() 
